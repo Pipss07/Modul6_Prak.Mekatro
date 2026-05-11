@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Dashboard ESP8266</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f9; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .data-box { font-size: 24px; font-weight: bold; margin: 20px 0; padding: 15px; border-radius: 10px; color: white; }
+        .temp { background: #ff5722; }
+        .hum { background: #2196f3; }
+        button { padding: 15px 30px; font-size: 18px; cursor: pointer; border: none; border-radius: 8px; transition: 0.3s; width: 100%; margin-top: 10px; }
+        .btn-on { background: #4caf50; color: white; }
+        .btn-off { background: #f44336; color: white; }
+        .status { font-size: 12px; margin-top: 10px; color: gray; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>ESP8266 Dashboard</h2>
+    <div id="status" class="status">Menghubungkan ke Broker...</div>
+
+    <div class="data-box temp">
+        Suhu: <span id="temp_val">--</span> °C
+    </div>
+    <div class="data-box hum">
+        Kelembaban: <span id="hum_val">--</span> %
+    </div>
+
+    <hr>
+    <h3>Kontrol LED</h3>
+    <button class="btn-on" onclick="sendMQTT('ON')">NYALAKAN LED</button>
+    <button class="btn-off" onclick="sendMQTT('OFF')">MATIKAN LED</button>
+</div>
+
+<script>
+    // Konfigurasi harus sama dengan di ESP8266
+    const broker = "broker.hivemq.com";
+    const port = 8000; // Port WebSocket untuk Browser
+    const clientId = "web_client_" + Math.random().toString(16).substr(2, 8);
+
+    const client = new Paho.MQTT.Client(broker, port, clientId);
+
+    client.onConnectionLost = (responseObject) => {
+        document.getElementById("status").innerHTML = "Koneksi Terputus: " + responseObject.errorMessage;
+    };
+
+    client.onMessageArrived = (message) => {
+        if (message.destinationName === "esp8266/temp") {
+            document.getElementById("temp_val").innerHTML = message.payloadString;
+        } else if (message.destinationName === "esp8266/hum") {
+            document.getElementById("hum_val").innerHTML = message.payloadString;
+        }
+    };
+
+    const options = {
+        onSuccess: () => {
+            document.getElementById("status").innerHTML = "Terhubung ke HiveMQ ✅";
+            client.subscribe("esp8266/temp");
+            client.subscribe("esp8266/hum");
+        },
+        onFailure: (err) => {
+            document.getElementById("status").innerHTML = "Gagal Terhubung: " + err.errorMessage;
+        },
+        useSSL: false
+    };
+
+    client.connect(options);
+
+    function sendMQTT(command) {
+        let message = new Paho.MQTT.Message(command);
+        message.destinationName = "esp8266/led";
+        client.send(message);
+    }
+</script>
+
+</body>
+</html>
